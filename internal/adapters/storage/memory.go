@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -112,7 +113,7 @@ func (m *MemoryStorage) TTL(ctx context.Context, key string) int64 {
 	return remaining
 }
 
-func (m *MemoryStorage) Persist(ctx context.Context, key string, seconds int) bool {
+func (m *MemoryStorage) Persist(ctx context.Context, key string) bool {
 	if ctx.Err() != nil {
 		return false
 	}
@@ -129,21 +130,96 @@ func (m *MemoryStorage) Persist(ctx context.Context, key string, seconds int) bo
 }
 
 func (m *MemoryStorage) Keys(ctx context.Context, pattern string) []string {
-	panic("unimplemented")
+	if ctx.Err() != nil {
+		return []string{}
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	now := time.Now().Unix()
+	var matches []string
+	for key, item := range m.data {
+		if item.IsExpired(now) {
+			continue
+		}
+
+		if matchPattern(key, pattern) {
+			matches = append(matches, key)
+		}
+	}
+
+	return matches
 }
 
 func (m *MemoryStorage) Exists(ctx context.Context, key string) bool {
-	panic("unimplemented")
+	if ctx.Err() != nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	item, exists := m.data[key]
+	if !exists {
+		return false
+	}
+
+	return !item.IsExpired(time.Now().Unix())
 }
 
 func (m *MemoryStorage) Size(ctx context.Context) int {
-	panic("unimplemented")
+	if ctx.Err() != nil {
+		return 0
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return len(m.data)
 }
 
 func (m *MemoryStorage) StartCleanUp(intervalMs int64) {
-	panic("unimplemented")
+	interval := time.Duration(intervalMs) * time.Millisecond
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				m.cleanupExpired()
+			case <-m.stopCleanup:
+				return
+			}
+		}
+	}()
 }
 
 func (m *MemoryStorage) StopCleanUp() {
-	panic("unimplemented")
+	close(m.stopCleanup)
+}
+
+func (m *MemoryStorage) cleanupExpired() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := time.Now().Unix()
+
+	for key, item := range m.data {
+		if item.IsExpired(now) {
+			delete(m.data, key)
+		}
+	}
+}
+
+func matchPattern(key, pattern string) bool {
+	if pattern == "*" {
+		return true
+	}
+
+	matched, err := filepath.Match(pattern, key)
+	if err != nil {
+		return key == pattern
+	}
+
+	return matched
 }
