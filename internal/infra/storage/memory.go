@@ -6,19 +6,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/g-villarinho/godis/internal/core/domain"
+	"github.com/g-villarinho/godis/internal/core/domain/entity"
 	"github.com/g-villarinho/godis/internal/core/ports"
 )
 
 type MemoryStorage struct {
-	data        map[string]*domain.Item
+	data        map[string]*entity.Item
 	mu          sync.RWMutex
 	stopCleanup chan struct{}
 }
 
 func NewMemoryStorage() ports.KeyValueRepository {
 	return &MemoryStorage{
-		data:        make(map[string]*domain.Item),
+		data:        make(map[string]*entity.Item),
 		stopCleanup: make(chan struct{}),
 	}
 }
@@ -30,7 +30,7 @@ func (m *MemoryStorage) Set(ctx context.Context, key string, value string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.data[key] = &domain.Item{
+	m.data[key] = &entity.Item{
 		Value:     value,
 		ExpiresAt: nil,
 	}
