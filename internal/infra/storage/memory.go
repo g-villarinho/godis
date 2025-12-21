@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/g-villarinho/godis/internal/core/domain/entity"
-	"github.com/g-villarinho/godis/internal/core/ports"
+	"github.com/g-villarinho/godis/internal/core/ports/repositories"
 )
 
 type MemoryStorage struct {
@@ -16,7 +16,7 @@ type MemoryStorage struct {
 	stopCleanup chan struct{}
 }
 
-func NewMemoryStorage() ports.KeyValueRepository {
+func NewMemoryStorage() repositories.KeyValueRepository {
 	return &MemoryStorage{
 		data:        make(map[string]*entity.Item),
 		stopCleanup: make(chan struct{}),
